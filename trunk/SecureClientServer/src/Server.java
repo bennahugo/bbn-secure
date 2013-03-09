@@ -56,7 +56,17 @@ public class Server implements SocketListener,Runnable{
 				return;
 			}
 		}
-		
+		for (int i = 0; i < unauthenticatedSockets.size(); ++i){
+			Pair<TCPSocket,Pair<String,String>> s = unauthenticatedSockets.get(i);
+			if (s.getVal1().clientSocket.getInetAddress().toString().equals(clientAddress.toString())){
+				if (s.getVal2().getVal2().equals(data)){
+					System.out.println("\nAUTH: " + s.getVal2().getVal1() + " has authenticed. Handshake complete.");
+					authenticatedSockets.add(new Pair<TCPSocket, String>(s.getVal1(), s.getVal2().getVal1()));
+				}
+				unauthenticatedSockets.remove(i);
+				return;
+			}
+		}
 		prompt();
 	}
 	private void prompt(){
