@@ -151,7 +151,7 @@ public class Client implements SocketListener, Runnable{
 					pk = new RSAPrivateKeySpec(pkMod, pkExp);
 					byte[] cypherText = null , plaintext = null;
 					try{
-						cypherText = cypher.RSAPubKeyEncrypt("7r@p".getBytes(), keyring.getKeys().get(name));
+						cypherText = cypher.RSAPubKeyEncrypt("7r@p d00R".getBytes(), keyring.getKeys().get(name));
 					} catch (Exception e){
 						System.out.println("Your key does not match RSA specifications. Please retry inputting your key.");
 						System.exit(1);
@@ -159,10 +159,10 @@ public class Client implements SocketListener, Runnable{
 					try{
 						plaintext = cypher.RSAPriKeyDecrypt(cypherText,pk);
 					} catch (Exception e){
-						e.printStackTrace();
+						System.out.println("Your key does not match RSA specifications. Please retry inputting your key.");
 						System.exit(1);
 					}
-					if (new String(plaintext).equals(new String("7r@p".getBytes()))){
+					if (new String(plaintext).equals(new String("7r@p d00R".getBytes()))){
 						System.out.println("Matches YAY!");
 					}
 					else {
