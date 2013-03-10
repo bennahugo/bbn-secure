@@ -2,23 +2,31 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Date;
 public class Server implements SocketListener,Runnable{
-	Thread _thread;
-	TCPServerSocket _sock;
-	NonBlockingReader _rdr;
-	ArrayList<TCPSocket> unknownSockets; 
-	ArrayList<Pair<TCPSocket,String>>authenticatedSockets; 
-	ArrayList<Pair<TCPSocket,Pair<String,String>>> unauthenticatedSockets; 
+	private Thread thread;
+	private TCPServerSocket sock;
+	private NonBlockingReader rdr;
+	private ArrayList<TCPSocket> unknownSockets; 
+	private ArrayList<Pair<TCPSocket,String>>authenticatedSockets; 
+	private ArrayList<Pair<TCPSocket,Pair<String,String>>> unauthenticatedSockets;
+	private KeyringReader keyring;
 	public Server(){
 		try {
-			_sock = new TCPServerSocket(this,ProtocolInfo.SERVER_PORT);
+			sock = new TCPServerSocket(this,ProtocolInfo.SERVER_PORT);
 		} catch (Exception e) {
 			System.out.println("Could not establish socket. This normally happens when you try to run multiple servers.");
 			e.printStackTrace();
 			System.exit(1);
 		}
-		_rdr = new NonBlockingReader(Driver.s);
-		_thread = new Thread(this);
-		_thread.start();
+		rdr = new NonBlockingReader(Driver.s);
+		try{
+			keyring = new KeyringReader(ProtocolInfo.KEYRING_LOCATION);
+		} catch (Exception e) {
+			System.out.println("\nCould not read keyring. Missing file or corrupted");
+			e.printStackTrace();
+			System.exit(1);
+		}
+		thread = new Thread(this);
+		thread.start();
 		unknownSockets = new ArrayList<TCPSocket>();
 		unauthenticatedSockets = new ArrayList<Pair<TCPSocket,Pair<String,String>>>(); 
 		authenticatedSockets = new ArrayList<Pair<TCPSocket,String>>();
@@ -28,10 +36,10 @@ public class Server implements SocketListener,Runnable{
 		prompt();
 		
 		try {
-			_thread.join();
+			thread.join();
 		} catch (InterruptedException e) {}
-		_sock.interrupt();
-		_rdr.interrupt();
+		sock.interrupt();
+		rdr.interrupt();
 	}
 	@Override
 	public synchronized void onIncommingData(InetAddress clientAddress, int port, String data) {
@@ -52,6 +60,7 @@ public class Server implements SocketListener,Runnable{
 				}
 				finally {
 					unknownSockets.remove(i);
+					prompt();
 				}
 				return;
 			}
@@ -60,8 +69,16 @@ public class Server implements SocketListener,Runnable{
 			Pair<TCPSocket,Pair<String,String>> s = unauthenticatedSockets.get(i);
 			if (s.getVal1().clientSocket.getInetAddress().toString().equals(clientAddress.toString())){
 				if (s.getVal2().getVal2().equals(data)){
-					System.out.println("\nAUTH: " + s.getVal2().getVal1() + " has authenticed. Handshake complete.");
-					authenticatedSockets.add(new Pair<TCPSocket, String>(s.getVal1(), s.getVal2().getVal1()));
+					try {
+						s.getVal1().sendData(ProtocolInfo.HANDSHAKE_ACK);
+						System.out.println("\nAUTH: " + s.getVal2().getVal1() + " has authenticed. Handshake complete.");
+						authenticatedSockets.add(new Pair<TCPSocket, String>(s.getVal1(), s.getVal2().getVal1()));
+					} catch (Exception e){
+					System.out.println("\nLost connection to " + s.getVal2().getVal1() + ". The party will have to retry later.");
+					}
+					finally{
+						prompt();
+					}
 				}
 				unauthenticatedSockets.remove(i);
 				return;
@@ -76,10 +93,10 @@ public class Server implements SocketListener,Runnable{
 	@Override
 	public void run() {
 		while (!Thread.interrupted()){
-			String input = _rdr.getNextLine();
+			String input = rdr.getNextLine();
 			if (input != null){
 				if (input.equals("X"))
-					_thread.interrupt();
+					thread.interrupt();
 				else{
 					System.out.println("\nInvalid Input");
 					prompt();

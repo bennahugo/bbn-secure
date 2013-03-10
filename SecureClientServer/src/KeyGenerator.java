@@ -1,5 +1,6 @@
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -22,13 +23,26 @@ import javax.crypto.NoSuchPaddingException;
 
 public class KeyGenerator {
 	private static Scanner s = new Scanner(System.in);
-	
+	private static KeyringReader keyring;
 	public static void main (String [] args) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeySpecException, FileNotFoundException, IOException{
 		System.out.println("********************************************************");
 		System.out.println("RSA keyring generator");
 		System.out.println("Warning: This tool is only for testing purposes only.");
 		System.out.println("         It saves your private key in an insecure file.");
 		System.out.println("********************************************************");
+		File f = new File(ProtocolInfo.KEYRING_LOCATION);
+		if (!f.exists()){
+			f.createNewFile();
+			System.out.println("Creating new keyring");
+		}
+		try{
+			keyring = new KeyringReader(ProtocolInfo.KEYRING_LOCATION);
+		} catch (Exception e) {
+			System.out.println("Keyring is corrupted. Delete keys manually and try again.");
+			e.printStackTrace();
+			System.exit(1);
+		}
+		
 		String answerFinal = "";
 		while (answerFinal.equals("")){
 			System.out.print("1 to create key and add to keyring,\n2 to display previously generated private and public keys\n>");
@@ -102,8 +116,14 @@ public class KeyGenerator {
 			oout.close();
 		}
 		oout = new ObjectOutputStream(
-				new BufferedOutputStream(new FileOutputStream("common.keyring",true)));
+				new BufferedOutputStream(new FileOutputStream("common.keyring")));
 		try {
+			for (String n : keyring.getKeys().keySet()){
+				oout.writeObject(n);
+				RSAPublicKeySpec key = keyring.getKeys().get(n);
+				oout.writeObject(key.getModulus());
+				oout.writeObject(key.getPublicExponent());
+			}
 			oout.writeObject(filename);
 			oout.writeObject(keyU.getModulus());
 			oout.writeObject(keyU.getPublicExponent());
