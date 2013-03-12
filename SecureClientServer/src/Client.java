@@ -29,6 +29,9 @@ public class Client implements SocketListener, Runnable{
 	 * Default constructor for client program
 	 */
 	public Client(){	
+		System.out.println("\n***********************************************");
+		System.out.println("*                   Client                    *");
+		System.out.println("***********************************************");
 		//Try to connect
 		InetAddress ip = null;
 		try{
@@ -43,6 +46,12 @@ public class Client implements SocketListener, Runnable{
 		} catch (Exception e) {
 			System.out.println("Could not establish socket. This normally happens if the server is not running.");
 			e.printStackTrace();
+			System.exit(1);
+		}
+		try{
+			sock.waitTillSocketSecured();
+		} catch (Exception e) {
+			System.out.println("Socket could not be secured");
 			System.exit(1);
 		}
 		//connected, so we can continue running
@@ -65,10 +74,6 @@ public class Client implements SocketListener, Runnable{
 		//Done preliminaries, start thread
 		thread = new Thread(this);
 		thread.start();
-		
-		System.out.println("\n***********************************************");
-		System.out.println("*                   Client                    *");
-		System.out.println("***********************************************");
 		prompt();
 		//Wait for the thread to finish and return to driver
 		try {
@@ -278,6 +283,11 @@ public class Client implements SocketListener, Runnable{
 	}
 	@Override
 	public void onIncommingConnection(TCPSocket s) {
+		// TODO Auto-generated method stub
+		
+	}
+	@Override
+	public void onClientSecured(TCPSocket s) {
 		// TODO Auto-generated method stub
 		
 	}

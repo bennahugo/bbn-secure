@@ -12,13 +12,18 @@ public class Server implements SocketListener,Runnable{
 	private Thread thread;
 	private TCPServerSocket sock;
 	private NonBlockingReader rdr;
-	private ArrayList<TCPSocket> unknownSockets; 
+	private ArrayList<TCPSocket> unknownSockets;
+	private ArrayList<TCPSocket> socketWithNoExchangedKeyArray;
 	private ArrayList<Pair<TCPSocket,String>>authenticatedSockets; 
 	private ArrayList<Pair<TCPSocket,Pair<String,byte[]>>> unauthenticatedSockets;
 	private KeyringReader keyring;
 	private CypherMachine cypher;
 	private RSAPrivateKeySpec pk;
+	/**
+	 * Default constructor for server program
+	 */
 	public Server(){
+		//Try to open a listening socket on the system
 		try {
 			sock = new TCPServerSocket(this,ProtocolInfo.SERVER_PORT);
 		} catch (Exception e) {
@@ -26,7 +31,9 @@ public class Server implements SocketListener,Runnable{
 			e.printStackTrace();
 			System.exit(1);
 		}
+		//Socket opened, instantiate a non-blocking input reader
 		rdr = new NonBlockingReader(Driver.s);
+		//Read the keyring
 		try{
 			keyring = new KeyringReader(ProtocolInfo.KEYRING_LOCATION);
 		} catch (Exception e) {
@@ -34,25 +41,29 @@ public class Server implements SocketListener,Runnable{
 			e.printStackTrace();
 			System.exit(1);
 		}
+		//Keyring loaded, now instantiate our cypher machine
 		try{
 			cypher = new CypherMachine();
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
+		//Here is the RSA private key of the server (this should probably not be stored in memory like this.... but ye its fine for our purposes...
 		pk = new RSAPrivateKeySpec(
 				new BigInteger("106552646548987747775799982470752321354613464888190003586735280912689621477051251518731532849179225407091383299774564288466375737201985922415443230079706656965365814775533860604483929010866271298722865213854049246766680001231445963555353946101665118756527053733522791467610722357913068363694616394809975353403"), 
 				new BigInteger("106227478639107870003623044306140720819481818749708870780574683751047527327251745128391018230416757715841886425337911514343463868373074053021313369908872735808120018916948511985165473414468692763600577631646191044252687002911039909747897627609423694632590367687176641827882267809786761047246539003414789701601"));
+		//fire up the server main loop
 		thread = new Thread(this);
 		thread.start();
 		unknownSockets = new ArrayList<TCPSocket>();
+		socketWithNoExchangedKeyArray = new ArrayList<TCPSocket>();
 		unauthenticatedSockets = new ArrayList<Pair<TCPSocket,Pair<String,byte[]>>>(); 
 		authenticatedSockets = new ArrayList<Pair<TCPSocket,String>>();
 		System.out.println("\n***********************************************");
 		System.out.println("*                   Server                    *");
 		System.out.println("***********************************************");
 		prompt();
-		
+		//Wait for the server thread to die before joining up with the main thread
 		try {
 			thread.join();
 		} catch (InterruptedException e) {}
@@ -117,7 +128,15 @@ public class Server implements SocketListener,Runnable{
 				return;
 			}
 		}
-		prompt();
+		for (int i = 0; i < authenticatedSockets.size(); ++i){
+			Pair<TCPSocket,String> s = authenticatedSockets.get(i);
+			if (s.getVal1().clientSocket.getInetAddress().toString().equals(clientAddress.toString())){
+				System.out.println("\n"+s.getVal2()+" says: "+data);
+				prompt();
+				return;
+			}
+		}
+		//ignore any other message
 	}
 	private void prompt(){
 		System.out.println("\nType 'X' to exit");
@@ -145,5 +164,9 @@ public class Server implements SocketListener,Runnable{
 	@Override
 	public synchronized void onIncommingConnection(TCPSocket s) {
 		unknownSockets.add(s);
+	}
+	@Override
+	public void onClientSecured(TCPSocket s) {
+		prompt();
 	}
 }
