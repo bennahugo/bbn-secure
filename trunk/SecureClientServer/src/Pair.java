@@ -1,4 +1,10 @@
-
+/**
+ * Pairs/Tupple Abstract Data Type
+ * @author benjamin
+ *
+ * @param <T1> Type 1
+ * @param <T2> Type 2
+ */
 public class Pair<T1,T2> {
 	T1 _i;
 	T2 _j;

@@ -6,7 +6,11 @@ import java.nio.ByteBuffer;
 import java.security.spec.RSAPrivateKeySpec;
 import java.util.Date;
 
-
+/**
+ * Client program for Secure transmission (provides authentication using RSA and AES block encryption using 
+ * Diffie Hellman key exchange)
+ * @author benjamin
+ */
 public class Client implements SocketListener, Runnable{
 	private TCPSocket sock;
 	private NonBlockingReader rdr;
@@ -21,6 +25,9 @@ public class Client implements SocketListener, Runnable{
 	private String name;
 	private CypherMachine cypher;
 	private KeyringReader keyring;
+	/**
+	 * Default constructor for client program
+	 */
 	public Client(){	
 		//Try to connect
 		InetAddress ip = null;
@@ -39,6 +46,7 @@ public class Client implements SocketListener, Runnable{
 			System.exit(1);
 		}
 		//connected, so we can continue running
+		//construct the non-blocking input reader
 		rdr = new NonBlockingReader(Driver.s);
 		try{
 			cypher = new CypherMachine();
@@ -46,6 +54,7 @@ public class Client implements SocketListener, Runnable{
 			e.printStackTrace();
 			System.exit(1);
 		}
+		//fetch the keyring
 		try{
 			keyring = new KeyringReader(ProtocolInfo.KEYRING_LOCATION);
 		} catch (Exception e) {
@@ -53,6 +62,7 @@ public class Client implements SocketListener, Runnable{
 			e.printStackTrace();
 			System.exit(1);
 		}
+		//Done preliminaries, start thread
 		thread = new Thread(this);
 		thread.start();
 		
@@ -60,7 +70,7 @@ public class Client implements SocketListener, Runnable{
 		System.out.println("*                   Client                    *");
 		System.out.println("***********************************************");
 		prompt();
-		
+		//Wait for the thread to finish and return to driver
 		try {
 			thread.join();
 		} catch (InterruptedException e) {}
@@ -72,18 +82,29 @@ public class Client implements SocketListener, Runnable{
 		synchronized(myState){
 			switch (myState){
 			case CS_SERVER_NOT_AUTHENTICATED:
-				System.out.println("AUTH Incomming RSA encrypted message:"+data);
-				String cleartext = null;
-				try{
-					cleartext = new String(cypher.RSAPriKeyDecrypt(data.getBytes(),pk));
-				} catch (Exception e){
-					e.printStackTrace();
+				//check for an issue of distrust at this stage
+				if (data.equals(ProtocolInfo.NO_TRUST)){
+					System.out.println("AUTH: The server raised a distrust flag. Aborting at this stage.");
 					System.exit(1);
 				}
-				if (timeStamp.toString().equals(cleartext.substring(0,cleartext.indexOf(',')))){
+				//we have already sent our time stamp to the server so now we await a return in the form
+				//encrypted myTimestamp ',' encrypted serverTimestamp (using RSA and my public key)
+				byte[] recvClientStamp = null,recvServerStamp = null;
+				try{
+					recvClientStamp = cypher.RSAPriKeyDecrypt(Base64.decode(data.substring(0,data.indexOf(','))),
+						pk);
+					recvServerStamp = cypher.RSAPriKeyDecrypt(Base64.decode(data.substring(data.indexOf(',')+1)),
+						pk);
+				} catch (Exception e) {
+					System.out.println("AUTH: Could not decrypt message using my private key. Server is not trustworthy. Aborting at this time.");
+					System.exit(1);
+				}
+				//The message has been decrypted, but is it any good, if not ABORT the connection immediately
+				if (CypherMachine.compareByteArrays(recvClientStamp, 
+						ByteBuffer.allocate(8).putLong(timeStamp.getTime()).array())){
 					try {
 						System.out.println("\nAUTH: Server has authenticated itself (received timestamp matches)");
-						sock.sendData(cleartext.substring(0,cleartext.indexOf(',')+1));
+						sock.sendData(Base64.encodeBytes(cypher.RSAPriKeyEncrypt(recvServerStamp, pk)));
 						myState = ClientState.CS_SERVER_AUTHENTICATED;
 						System.out.println("\nAUTH: I've authenticated myself by sending the server's timestamp back");
 						prompt();
@@ -91,10 +112,17 @@ public class Client implements SocketListener, Runnable{
 						System.out.println("\nConnection has been lost. Could not send data. Please check server and try sending again.");
 						System.exit(1);
 					}
+				} else {
+					System.out.println("AUTH: Could not decrypt message using my private key. Server is not trustworthy. Aborting at this time.");
+					System.exit(1);
 				}
 				break;
 			case CS_SERVER_AUTHENTICATED:
-				if (data.equals(ProtocolInfo.HANDSHAKE_ACK)){
+				//Check for an issue of no trust:
+				if (data.equals(ProtocolInfo.NO_TRUST)){
+					System.out.println("AUTH: The server raised a distrust flag. Aborting at this stage.");
+					System.exit(1);
+				} else if (data.equals(ProtocolInfo.HANDSHAKE_ACK)){ //otherwise we await handshake confirmation
 					myState = ClientState.CS_HANDSHAKE_ACHIEVED;
 					System.out.println("AUTH: Handshake successfully achieved");
 					prompt();
@@ -106,6 +134,9 @@ public class Client implements SocketListener, Runnable{
 			}
 		}
 	}
+	/**
+	 * Procedure to prompt the user with the correct message (based on state)
+	 */
 	private void prompt(){
 		synchronized(myState){
 			switch (myState){
@@ -130,6 +161,10 @@ public class Client implements SocketListener, Runnable{
 			}
 		}
 	}
+	/**
+	 * Procedure for handling input received from the user (based on state)
+	 * @param input
+	 */
 	private void handleInput(String input){ 
 		synchronized(myState){
 			switch (myState){
@@ -159,6 +194,7 @@ public class Client implements SocketListener, Runnable{
 					
 					pk = new RSAPrivateKeySpec(pkMod, pkExp);
 					byte[] cypherText = null , plaintext = null;
+					//First check if the user entered the correct private key by encrypting and decrypting some arb string
 					try{
 						cypherText = cypher.RSAPubKeyEncrypt("7r@p d00R".getBytes(), keyring.getKeys().get(name));
 					} catch (Exception e){
@@ -171,18 +207,21 @@ public class Client implements SocketListener, Runnable{
 						System.out.println("Your key does not match RSA specifications. Please retry inputting your key.");
 						System.exit(1);
 					}
-					if (new String(plaintext).equals(new String("7r@p d00R".getBytes()))){
+					//Check decrypted text
+					if (CypherMachine.compareByteArrays("7r@p d00R".getBytes(),plaintext)){
 						System.out.println("Access Granted");
 					}
 					else {
 						System.out.println("Access Denied");
 						System.exit(1);
 					}
+					//The user has entered the correct key combination (mod and exponent)
 					myState = ClientState.CS_SERVER_NOT_AUTHENTICATED;
+					//Start handshake by encrypting a timestamp with the server's public key
 					timeStamp = new java.util.Date();
-					try{	
+					try{
 						sock.sendData(name+","+
-								new String(cypher.RSAPubKeyEncrypt(
+								Base64.encodeBytes(cypher.RSAPubKeyEncrypt(
 										ByteBuffer.allocate(8).putLong(timeStamp.getTime()).array(),
 										keyring.getKeys().get("server"))));
 						System.out.println("\nAUTH: I've generated a time stamp and sent it off to the server for authentication");
@@ -205,6 +244,7 @@ public class Client implements SocketListener, Runnable{
 				prompt();
 				break;
 			case CS_HANDSHAKE_ACHIEVED:
+				//Now we can finally start sending text accross the network. It is secured by AES with an exchanged key
 				if (input.equals("X"))
 					thread.interrupt();
 				else if (input.trim().startsWith("SEND ")){ 

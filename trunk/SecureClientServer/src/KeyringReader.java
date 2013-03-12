@@ -9,14 +9,26 @@ import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.HashMap;
 
-
+/**
+ * Keyring file reader
+ * @author benjamin
+ */
 public class KeyringReader {
 	private final HashMap<String,RSAPublicKeySpec> keys;
-	
+	/**
+	 * gets a hash map of public keys (based on person's name) 
+	 * @return hash map of keys
+	 */
 	public HashMap<String, RSAPublicKeySpec> getKeys() {
 		return keys;
 	}
-
+	/**
+	 * Default constructor for keyring reader
+	 * Keyring object file is in the format name, public modulus, private modulus
+	 * @param filename filename of keyring
+	 * @throws FileNotFoundException iff keyring object file is not found
+	 * @throws IOException iff keyring object file is corrupted
+	 */
 	public KeyringReader(String filename) throws FileNotFoundException, IOException{
 		keys = new HashMap<String,RSAPublicKeySpec>();
 		ObjectInputStream oin = null;
