@@ -2,6 +2,7 @@ import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.security.spec.RSAPrivateKeySpec;
 import java.util.Date;
 
@@ -71,10 +72,18 @@ public class Client implements SocketListener, Runnable{
 		synchronized(myState){
 			switch (myState){
 			case CS_SERVER_NOT_AUTHENTICATED:
-				if (timeStamp.toString().equals(data.split(",")[0])){
+				System.out.println("AUTH Incomming RSA encrypted message:"+data);
+				String cleartext = null;
+				try{
+					cleartext = new String(cypher.RSAPriKeyDecrypt(data.getBytes(),pk));
+				} catch (Exception e){
+					e.printStackTrace();
+					System.exit(1);
+				}
+				if (timeStamp.toString().equals(cleartext.substring(0,cleartext.indexOf(',')))){
 					try {
 						System.out.println("\nAUTH: Server has authenticated itself (received timestamp matches)");
-						sock.sendData(data.split(",")[1]);
+						sock.sendData(cleartext.substring(0,cleartext.indexOf(',')+1));
 						myState = ClientState.CS_SERVER_AUTHENTICATED;
 						System.out.println("\nAUTH: I've authenticated myself by sending the server's timestamp back");
 						prompt();
@@ -163,15 +172,19 @@ public class Client implements SocketListener, Runnable{
 						System.exit(1);
 					}
 					if (new String(plaintext).equals(new String("7r@p d00R".getBytes()))){
-						System.out.println("Matches YAY!");
+						System.out.println("Access Granted");
 					}
 					else {
-						System.out.println("Doesn't match FUCKOFF!");
+						System.out.println("Access Denied");
+						System.exit(1);
 					}
 					myState = ClientState.CS_SERVER_NOT_AUTHENTICATED;
 					timeStamp = new java.util.Date();
-					try{
-						sock.sendData(name+","+timeStamp.toString());
+					try{	
+						sock.sendData(name+","+
+								new String(cypher.RSAPubKeyEncrypt(
+										ByteBuffer.allocate(8).putLong(timeStamp.getTime()).array(),
+										keyring.getKeys().get("server"))));
 						System.out.println("\nAUTH: I've generated a time stamp and sent it off to the server for authentication");
 					} catch (Exception e) {
 						System.out.println("\nConnection has been lost. Could not send data. Please check server and try sending again.");
