@@ -32,8 +32,10 @@ public class TCPSocket extends Thread{
 	{
 		try
 		{
+			String sendText = Base64.encodeBytes(data.getBytes());
+			System.out.println("SEND: "+sendText);
 			DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream());
-			outToServer.writeBytes(data + '\n');
+			outToServer.writeBytes(sendText + '\n');
 		} catch (Exception e) 
 		{ 
 			throw new Exception("Connection timed out");
@@ -53,8 +55,9 @@ public class TCPSocket extends Thread{
 					String line = inFromClient.readLine();
 					while (line != null)
 					{
+						System.out.println("RECV: "+line);
 						ear.onIncommingData(clientSocket.getInetAddress(), 
-								clientSocket.getPort(), line);
+								clientSocket.getPort(), new String(Base64.decode(line)));
 						line = inFromClient.readLine();
 					}
 				}
