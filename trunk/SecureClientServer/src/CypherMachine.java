@@ -1,8 +1,14 @@
+import java.math.BigInteger;
+import java.security.AlgorithmParameters;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.InvalidParameterSpecException;
+import java.security.spec.KeySpec;
 import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 
@@ -10,16 +16,22 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 
 
 public class CypherMachine {
 	private Cipher rsa;
 	/**
 	 * Default constructor for the CypherMachine
-	 * @throws NoSuchAlgorithmException RSA or AES not available
+	 * @throws NoSuchAlgorithmException RSA not available
 	 * @throws NoSuchPaddingException Selected padding not available on the system
+	 * @throws InvalidKeySpecException  
 	 */
-	public CypherMachine () throws NoSuchAlgorithmException, NoSuchPaddingException{
+	public CypherMachine () throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeySpecException, InvalidKeyException, InvalidParameterSpecException{
 		rsa = Cipher.getInstance("RSA");
 	}
 	/**
@@ -89,6 +101,42 @@ public class CypherMachine {
 		rsa.init(Cipher.DECRYPT_MODE, keyFac.generatePrivate(key));
 		byte[] clearText = rsa.doFinal(cypherText);
 		return clearText;
+	}
+	public static byte[]AESEncrypt(byte[] plainText,SecretKey aesKey, Cipher aes) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidParameterSpecException{
+		byte[] cyphertext = aes.doFinal(plainText);
+		return cyphertext;
+	}
+	public static byte[] AESDecrypt(byte[] cypherText,SecretKey aesKey,byte[] iv, Cipher aes) throws InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException{
+		byte[] clearText = aes.doFinal(cypherText);
+		return clearText;
+	}
+	public static Object[] instantiateAESCypher(byte [] salt, String password, byte[] IV) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidParameterSpecException, InvalidKeySpecException, InvalidKeyException, InvalidAlgorithmParameterException{
+		Object[] collection = new Object[3];
+		//Generate the key
+		SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+		KeySpec spec = new PBEKeySpec(password.toCharArray(), salt , 65536, 128);
+		SecretKey tmp = factory.generateSecret(spec);
+		SecretKey aesKey = new SecretKeySpec(tmp.getEncoded(), "AES");
+		//Construct the cipher
+		Cipher aes = Cipher.getInstance("AES/CBC/PKCS5Padding");
+		if (IV == null){
+			aes.init(Cipher.ENCRYPT_MODE, aesKey);
+			AlgorithmParameters params = aes.getParameters();
+			IV = params.getParameterSpec(IvParameterSpec.class).getIV();
+		} else {
+			aes.init(Cipher.DECRYPT_MODE, aesKey, new IvParameterSpec(IV));
+		}
+		//return aes, aes key and IV
+		collection[0] = aes;
+		collection[1] = aesKey;
+		collection[2] = IV;
+		return collection;
+	}
+	public static byte[] generateSalt(){
+		byte [] mSalt = new byte [8];
+        SecureRandom rnd = new SecureRandom();
+        rnd.nextBytes (mSalt);
+        return mSalt;
 	}
 	/**
 	 * Compare byte arrays 

@@ -16,4 +16,6 @@ public interface SocketListener {
 	 * @param s a TCPSocket
 	 */
 	public void onIncommingConnection(TCPSocket s);
+	
+	public void onClientSecured(TCPSocket s);
 }
