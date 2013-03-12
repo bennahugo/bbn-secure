@@ -20,21 +20,35 @@ import java.util.Scanner;
 
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
-
+/**
+ * RSA keyring generator for testing purposes
+ * WARNING: INSECURE STORAGE OF PRIMARY KEY. 
+ * 			IF YOU NEED TO USE IT FOR REAL LIFE 
+ * 			PURPOSES THEN REMOVE THE STORAGE OF THE PRIVATE KEY. 
+ * @author benjamin
+ *
+ */
 public class KeyGenerator {
 	private static Scanner s = new Scanner(System.in);
 	private static KeyringReader keyring;
+	/**
+	 * Driver method for key generator (select 1 to add to keyring, 2 to recall keys (TESTING ONLY))
+	 * @param args
+	 */
+	
 	public static void main (String [] args) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeySpecException, FileNotFoundException, IOException{
 		System.out.println("********************************************************");
 		System.out.println("RSA keyring generator");
 		System.out.println("Warning: This tool is only for testing purposes only.");
 		System.out.println("         It saves your private key in an insecure file.");
 		System.out.println("********************************************************");
+		//Create keyring file if not exists
 		File f = new File(ProtocolInfo.KEYRING_LOCATION);
 		if (!f.exists()){
 			f.createNewFile();
 			System.out.println("Creating new keyring");
 		}
+		//read the keyring
 		try{
 			keyring = new KeyringReader(ProtocolInfo.KEYRING_LOCATION);
 		} catch (Exception e) {
@@ -42,7 +56,7 @@ public class KeyGenerator {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		
+		//ask the user what to do
 		String answerFinal = "";
 		while (answerFinal.equals("")){
 			System.out.print("1 to create key and add to keyring,\n2 to display previously generated private and public keys\n>");
@@ -61,6 +75,11 @@ public class KeyGenerator {
 		}
 		System.out.println("Done");
 	}
+	/**
+	 * Procedure to generate public/private key set
+	 * @throws NoSuchAlgorithmException is thrown when the RSA subsystem is missing
+	 * @throws IOException In case the file was corrupted
+	 */
 	private static void generate() throws NoSuchAlgorithmException, InvalidKeySpecException, FileNotFoundException, IOException{
 		KeyPair kp = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 		KeyFactory fact = KeyFactory.getInstance("RSA");
@@ -84,6 +103,11 @@ public class KeyGenerator {
 		saveToFile(ownerName,pub,priv);
 		System.out.println("Saved file to "+ownerName+".keys");
 	}
+	/**
+	 * Displays keys from a keypair file (VERY INSECURE --- KEEP THIS FILE SECURE YOURSELF)
+	 * @throws FileNotFoundException
+	 * @throws IOException File was corrupted
+	 */
 	private static void loadOld() throws FileNotFoundException, IOException{
 		System.out.print("\n\nEnter your name:\n>");
 		String ownerName = s.nextLine();
@@ -102,7 +126,16 @@ public class KeyGenerator {
 		System.out.println("EXP: " + priv.getPrivateExponent());
 		System.out.println("MOD: " + priv.getModulus());
 	}
+	/**
+	 * Saves the keypair to a .keys object file (VERY INSECURE), as well as adding it to a common keyring
+	 * @param filename excluding extension
+	 * @param keyU Public key
+	 * @param keyR Private key
+	 * @throws FileNotFoundException if keyring does not exist
+	 * @throws IOException
+	 */
 	public static void saveToFile(String filename,RSAPublicKeySpec keyU,RSAPrivateKeySpec keyR) throws FileNotFoundException, IOException{
+		//Save the keyset to an object file (VERY INSECURE)
 		ObjectOutputStream oout = new ObjectOutputStream(
 				new BufferedOutputStream(new FileOutputStream(filename+".keys")));
 		try {
@@ -115,6 +148,7 @@ public class KeyGenerator {
 		} finally {
 			oout.close();
 		}
+		//saves the public key to the keyring
 		oout = new ObjectOutputStream(
 				new BufferedOutputStream(new FileOutputStream("common.keyring")));
 		try {
@@ -133,6 +167,13 @@ public class KeyGenerator {
 			oout.close();
 		}
 	}
+	/**
+	 * Loads keyset from a previously generated .keys object file
+	 * @param filename (excluding extension)
+	 * @return [public key, private key] as object array (just cast back) 
+	 * @throws FileNotFoundException File does not exist
+	 * @throws IOException File corrupted
+	 */
 	public static Object[] loadFromFile(String filename) throws FileNotFoundException, IOException{
 		Object arr [] = new Object[2];
 		ObjectInputStream oin = new ObjectInputStream(

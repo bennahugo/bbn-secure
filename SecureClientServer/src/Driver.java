@@ -1,4 +1,9 @@
 import java.util.Scanner;
+/**
+ * Driver class for application layer security (key exchange and authentication)
+ * Network and internetwork Security
+ * @author benjamin
+ */
 public class Driver {
 	static Scanner s = null;
 	public static void main (String [] args){
@@ -17,11 +22,11 @@ public class Driver {
 			String nextln = s.nextLine();
 			if (nextln.equals("1")){
 				option = 1;
-				Client client = new Client();
+				Client client = new Client(); // this thread will join up with the main thread when the client quits
 			}
 			else if (nextln.equals("2")){
 				option = 2;
-				Server server = new Server();
+				Server server = new Server(); // this thread will join up with the main thread when the server quits
 			}
 			else if (nextln.equals("X")){
 				option = 3;
